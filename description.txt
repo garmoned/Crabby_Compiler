@@ -1,0 +1,42 @@
+basic language features
+
+only ints and strings for now
+
+var name = [name|literal]
+
+math
+
+var name = [name|literal] + [name|literal]
+
+if statements
+
+while statements
+
+example Program
+
+
+str a = "a"
+int b = 2
+
+if ( b ==  2 ) {
+    print ( a )
+}
+
+
+
+type => str | int
+
+statements => statement statements | statement
+declarations => declaration | declarations
+
+expression => [name | intlit | strlit | action ]
+
+action => expression operation expression
+
+declare => type name equals expression
+
+statement => print ( expression )
+             if ( expression ) { declarations statements }
+
+
+program => declarations statements
