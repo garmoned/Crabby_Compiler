@@ -1,2 +1,2 @@
-str a = 'world'
-int b = 2
+int x = x + 'nenen'
+print( x )
