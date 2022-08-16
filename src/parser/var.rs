@@ -1,13 +1,17 @@
 pub enum Var {
     Str,
     Int,
+    Bool,
 }
 
 impl ToString for Var {
     fn to_string(&self) -> String {
         match self {
-            Var::Str => { "str" }
-            Var::Int => { "int" }
-        }.parse().unwrap()
+            Var::Bool => "bool",
+            Var::Str => "str",
+            Var::Int => "int",
+        }
+        .parse()
+        .unwrap()
     }
 }

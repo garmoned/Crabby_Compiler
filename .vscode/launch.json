@@ -1,0 +1,45 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug executable 'Crabby_Compiler'",
+            "cargo": {
+                "args": [
+                    "build",
+                    "--bin=Crabby_Compiler",
+                    "--package=Crabby_Compiler"
+                ],
+                "filter": {
+                    "name": "Crabby_Compiler",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug unit tests in executable 'Crabby_Compiler'",
+            "cargo": {
+                "args": [
+                    "test",
+                    "--no-run",
+                    "--bin=Crabby_Compiler",
+                    "--package=Crabby_Compiler"
+                ],
+                "filter": {
+                    "name": "Crabby_Compiler",
+                    "kind": "bin"
+                }
+            },
+            "args": [],
+            "cwd": "${workspaceFolder}"
+        }
+    ]
+}

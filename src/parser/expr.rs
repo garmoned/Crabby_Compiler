@@ -1,11 +1,13 @@
 use crate::{Lexeme, Token};
+use std::{fmt::format, fs::OpenOptions};
 
 pub enum Operation {
     Equals,
     Times,
-    Plus
+    Plus,
 }
 
+#[derive(Debug)]
 pub enum ExprData {
     StrLit(String),
     IntLit(i16),
@@ -14,207 +16,126 @@ pub enum ExprData {
 
 pub enum Factor {
     Data(ExprData),
-    Expr(Box<Expr>)
+    Expr(Box<TopExpr>),
 }
 
 pub enum Term {
-    TermFactor(Option<Box<TermPrime>>, Box<Factor>)
+    TermFactor(Option<Box<TermPrime>>, Box<Factor>),
 }
 
 pub enum TermPrime {
     More(Box<Factor>, Option<Box<TermPrime>>),
 }
 
-pub enum Expr {
+pub enum AddExpr {
     Term(Term),
-    TermExpression(Term, Box<Expr>)
+    TermExpression(Term, Box<AddExpr>),
+}
+
+pub enum TopExpr {
+    Term(AddExpr),
+    TermExpression(AddExpr, Box<TopExpr>),
+}
+
+pub enum Expr {
+    Unary(ExprData),
+    Binary(Box<Expr>, Box<Expr>, Operation),
 }
 
 impl Expr {
     pub(crate) fn new(lex: &Lexeme, mut x: &mut usize) -> Option<Box<Self>> {
-        // println!("new expr");
         let save = x.clone();
-        match Term::new(lex,x){
-            None => {
-                *x = save;
-                None}
-            Some(term) => {
-                match lex[*x] {
-                    Token::Plus => {
-                        *x+=1;
-                        // println!("matched plus");
-                        let save = x.clone();
-                        match Expr::new(lex,x) {
-                            None => {*x = save; None}
-                            Some(expr) => {
-                                Some(Box::from(Expr::TermExpression(term, expr)))
-                            }
-                        }
-                    }
-                    _ => {
-                        Some(Box::from(Expr::Term(term)))
-                    }
+        let mut expr_stack: Vec<Expr> = vec![];
+        let mut op_stack: Vec<Operation> = vec![];
+        loop {
+            match &lex[*x] {
+                Token::StringLit(string) => {
+                    expr_stack.push(Expr::Unary(ExprData::StrLit(string.to_string())))
+                }
+                Token::IntLit(int) => expr_stack.push(Expr::Unary(ExprData::IntLit(*int))),
+                Token::Name(name) => expr_stack.push(Expr::Unary(ExprData::Name(name.to_string()))),
+                Token::Times => {
+                    perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
+                }
+                Token::Equals => {
+                    perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
+                }
+                Token::Plus => {
+                    perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
+                }
+                _ => {
+                    break;
                 }
             }
+            *x += 1
+        }
+
+        while op_stack.len() > 0 {
+            combine_expression(&mut expr_stack, &mut op_stack)
+        }
+
+        return Some(Box::new(expr_stack.pop().unwrap()));
+    }
+}
+
+impl From<Token> for Operation {
+    fn from(tok: Token) -> Self {
+        match tok {
+            Token::Times => Operation::Times,
+            Token::Plus => Operation::Plus,
+            Token::Equals => Operation::Equals,
+            _ => panic!("invalid operator"),
         }
     }
 }
 
-impl Term {
-    pub fn new(lex: &Lexeme, mut x: &mut usize) -> Option<Self> {
-        // println!("new term {:?}", lex[*x]);
-        let save = x.clone();
-        match Factor::new(lex,x) {
-            None => {
-                *x = save;
-                None
-            }
-            Some(fact) => {
-               Some(Term::TermFactor(
-                    TermPrime::new(lex,x),
-                    Box::from(fact)
-                ))
-            }
-        }
-
+fn get_priority(op: &Operation) -> u8 {
+    match op {
+        Operation::Times => 3,
+        Operation::Plus => 2,
+        Operation::Equals => 1,
+        _ => panic!("invalid operator"),
     }
 }
 
-impl TermPrime {
-    fn new(lex: &Lexeme, mut x: &mut usize) -> Option<Box<Self>> {
-        // println!("new termprime");
-        let save = x.clone();
-        // println!("{:?}",lex[*x]);
-        match lex[*x] {
-            Token::Times => {}
-            _ => {return None}
-        }
-        *x+=1;
-        let factor = Factor::new(lex,x);
-        match factor {
-            None => {
-                *x = save;
-                None}
-            Some(fact) => {
-                Some(Box::from(TermPrime::More(Box::from(fact), TermPrime::new(lex, x))))
-            }
-        }
+fn perform_operation(expr_stack: &mut Vec<Expr>, op_stack: &mut Vec<Operation>, tok: Operation) {
+    let oper: Operation = tok.into();
+    while op_stack.len() >= 1 && get_priority(&oper) <= get_priority(&*op_stack.last().unwrap()) {
+        combine_expression(expr_stack, op_stack)
     }
+    op_stack.push(oper)
 }
 
-impl Factor {
-    pub fn new(lex: &Lexeme, mut x: &mut usize) -> Option<Self>{
-        // println!("new factor {:?}", lex[*x]);
-        let save = x.clone();
-        match Factor::try_paren(lex,x){
-            None => {
-                *x = save;
-                match Factor::try_id(lex,x){
-                    None => {None}
-                    Some(id) => {Some(id)}
-                }
-            }
-            Some(expr) => {
-                Some(expr)
-            }
-        }
-    }
-
-    pub fn try_paren(lex: &Lexeme, mut x: &mut usize) -> Option<Self>{
-        let save = x.clone();
-        match lex[*x] {
-            Token::OpenParen => {},
-            _ => {return None}
-        }
-        *x+=1;
-        let data = Expr::new(lex,x);
-        match lex[*x] {
-            Token::CloseParen => {},
-            _ => {return None}
-        }
-        *x+=1;
-        match data {
-            None => {*x = save; None}
-            Some(expr) => {
-                Some(Factor::Expr(expr))
-            }
-        }
-    }
-
-    pub fn try_id(lex: &Lexeme, mut x: &mut usize) -> Option<Self> {
-        match ExprData::new(lex,x) {
-            None => { None}
-            Some(data) => { Some(Factor::Data(data))}
-        }
-    }
-}
-
-impl ExprData {
-    pub fn new(lex: &Lexeme, mut x: &mut usize) -> Option<Self> {
-        match &lex[*x] {
-            Token::Name(string) => {
-                *x+= 1;Some(ExprData::Name(string.clone()))}
-            Token::IntLit(int) => {
-                *x+= 1;Some(ExprData::IntLit(int.clone()))}
-            Token::StringLit(string) => {
-                *x+= 1;Some(ExprData::StrLit(string.clone()))}
-            _ => { None }
-        }
-
-    }
+fn combine_expression(expr_stack: &mut Vec<Expr>, op_stack: &mut Vec<Operation>) {
+    let op = op_stack.pop().unwrap();
+    let operand1 = expr_stack.pop().unwrap();
+    let operand2 = expr_stack.pop().unwrap();
+    let expr = Expr::Binary(Box::new(operand1), Box::new(operand2), op);
+    expr_stack.push(expr)
 }
 
 impl ToString for Expr {
     fn to_string(&self) -> String {
         match self {
-            Expr::Term(term) => {format!("({})",term.to_string())}
-            Expr::TermExpression(term, expr)
-            => {format!("({}) + {}",term.to_string(), expr.to_string())}
+            Expr::Unary(data) => format!("{:?}", data),
+            Expr::Binary(oper1, oper2, op) => {
+                format!(
+                    "({} {} {})",
+                    oper1.to_string(),
+                    op.to_string(),
+                    oper2.to_string()
+                )
+            }
         }
     }
 }
 
-impl ToString for TermPrime {
-    fn to_string(&self) -> String {
-        match self { TermPrime::More(factor, more) => {
-         match more {
-             None => {format!("*{}",factor.to_string())}
-             Some(more) => {format!("*{}{}",factor.to_string(),more.to_string())}
-         }
-        }}
-    }
-}
-
-impl ToString for Term {
-    fn to_string(&self) -> String {
-        match self { Term::TermFactor(more, factor) => {
-            match more {
-                None => { format!("{}",factor.to_string())}
-                Some(more) => { format!("{}{}",factor.to_string(),more.to_string())}
-            }
-        } }
-    }
-}
-
-impl ToString for ExprData {
-    fn to_string(&self) -> String {
-         match self {
-             ExprData::StrLit(str) => {str.to_string()}
-             ExprData::IntLit(int) => {int.to_string()}
-             ExprData::Name(str) => {str.to_string()}
-         }
-    }
-}
-
-impl ToString for Factor {
+impl ToString for Operation {
     fn to_string(&self) -> String {
         match self {
-            Factor::Data(data) => {
-                data.to_string()
-            }
-            Factor::Expr(expr) => {
-                expr.to_string()
-            }
+            Operation::Equals => "==".to_owned(),
+            Operation::Times => "*".to_owned(),
+            Operation::Plus => "+".to_owned(),
         }
     }
 }

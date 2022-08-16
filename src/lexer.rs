@@ -2,12 +2,16 @@ use std::borrow::Borrow;
 
 use regex::RegexSet;
 
-use crate::lexer::Token::{Assign, CloseBrace, CloseParen, Equals, If, Ignore, Int, OpenBrace, OpenParen, Print, Semi, Str, WhiteSpace};
+use crate::lexer::Token::{
+    Assign, CloseBrace, CloseParen, Equals, If, Ignore, Int, OpenBrace, OpenParen, Print, Semi,
+    Str, WhiteSpace,
+};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Token {
     Int,
     Str,
+    While,
     StringLit(String),
     IntLit(i16),
     OpenParen,
@@ -24,9 +28,9 @@ pub enum Token {
     Ignore,
     Times,
     Plus,
-    EOF
+    Bool,
+    EOF,
 }
-
 
 pub type Lexeme = Vec<Token>;
 
@@ -40,29 +44,31 @@ impl Lexer {
         let digit = r"[0-9]";
         let name = format!("^{}({}|{})*$", letter, letter, digit);
         let int_lit = format!(r"^{}+$", digit);
-        let string_lit = r"^'([^'\\]|\\.)*'$";
+        let string_lit = r#"^"([^"\\]|\\.)*"$"#;
         let white_space = r"^[ \n\t\r]$";
-
         Self {
             match_set: RegexSet::new(&[
                 r"^int$", //0
                 r"^str$", //1
-                string_lit, //2
+                r"^bool$",
+                r"^while$",
+                string_lit,       //2
                 int_lit.borrow(), //3
-                r"^\($", //4
-                r"^\)$", //5
-                r"^=$", //6
-                r"^==$", //7
-                r"^print$", //8
-                r"^\{$", //9
-                r"^}$", //10
-                white_space, //11
-                r"^;$", //12
-                r"^if$", // 13
-                r"^\*$", // 14
-                r"^\+$", //15
-                name.borrow(), //16
-            ]).unwrap()
+                r"^\($",          //4
+                r"^\)$",          //5
+                r"^=$",           //6
+                r"^==$",          //7
+                r"^print$",       //8
+                r"^\{$",          //9
+                r"^}$",           //10
+                white_space,      //11
+                r"^;$",           //12
+                r"^if$",          // 13
+                r"^\*$",          // 14
+                r"^\+$",          //15
+                name.borrow(),    //16
+            ])
+            .unwrap(),
         }
     }
 
@@ -70,23 +76,21 @@ impl Lexer {
         let mut lexeme = vec![];
         let mut prev = "".to_string();
         for char in code.chars() {
-            let new = format!("{}{}",prev,char);
-            println!("{}, {}" , prev, new);
+            let new = format!("{}{}", prev, char);
+            println!("{}, {}", prev, new);
             match self.match_token(new.as_str()) {
-                None => {
-                     match self.match_token(prev.as_str()) {
-                         None => {
-                             prev.push(char);
-                         }
-                         Some(tok) => {
-                             match tok{
-                                 WhiteSpace => (),
-                                 _ => { lexeme.push(tok)}
-                             }
-                             prev = char.to_string();
-                         }
-                     }
-                }
+                None => match self.match_token(prev.as_str()) {
+                    None => {
+                        prev.push(char);
+                    }
+                    Some(tok) => {
+                        match tok {
+                            WhiteSpace => (),
+                            _ => lexeme.push(tok),
+                        }
+                        prev = char.to_string();
+                    }
+                },
                 Some(_) => {
                     prev.push(char);
                 }
@@ -94,7 +98,7 @@ impl Lexer {
         }
         match self.match_token(&prev) {
             None => {}
-            Some(tok) => {lexeme.push(tok)}
+            Some(tok) => lexeme.push(tok),
         }
         lexeme.push(Token::EOF);
         lexeme
@@ -106,24 +110,24 @@ impl Lexer {
         match m {
             0 => Some(Int),
             1 => Some(Str),
-            2 => {
-                Some(Token::StringLit(txt.replace("'", "")))
-            }
-            3 => Some(Token::IntLit(txt.parse().unwrap())),
-            4 => Some(OpenParen),
-            5 => Some(CloseParen),
-            6 => Some(Assign),
-            7 => Some(Equals),
-            8 => Some(Print),
-            9 => Some(OpenBrace),
-            10 => Some(CloseBrace),
-            11 => Some(WhiteSpace),
-            12 => Some(Semi),
-            13 => Some(If),
-            14 => Some(Token::Times),
-            15 => Some(Token::Plus),
-            16 => Some(Token::Name(txt.parse().unwrap())),
-            _ => None
+            2 => Some(Token::Bool),
+            3 => Some(Token::While),
+            4 => Some(Token::StringLit(txt.replace("'", ""))),
+            5 => Some(Token::IntLit(txt.parse().unwrap())),
+            6 => Some(OpenParen),
+            7 => Some(CloseParen),
+            8 => Some(Assign),
+            9 => Some(Equals),
+            10 => Some(Print),
+            11 => Some(OpenBrace),
+            12 => Some(CloseBrace),
+            13 => Some(WhiteSpace),
+            14 => Some(Semi),
+            15 => Some(If),
+            16 => Some(Token::Times),
+            17 => Some(Token::Plus),
+            18 => Some(Token::Name(txt.parse().unwrap())),
+            _ => None,
         }
     }
 }

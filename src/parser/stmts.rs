@@ -1,90 +1,139 @@
-use std::borrow::Borrow;
+use inkwell::types::BasicMetadataTypeEnum;
 
-use crate::{Lexeme, Token};
+use crate::code_gen::Compiler;
 use crate::parser::decls::Decls;
-use crate::parser::expr::Expr;
+use crate::parser::expr::{Expr, TopExpr};
+use crate::{Lexeme, Token};
 
-pub(crate) struct Stmts {
-    stmt: Box<dyn Stmt>,
+use super::expr::ExprData;
+
+pub struct Stmts {
+    pub stmt: StmtType,
     stmts: Option<Box<Stmts>>,
 }
 
-
-struct PrintStmt {
-    expr: Box<Expr>,
+pub struct PrintStmt {
+    pub expr: Box<Expr>,
 }
 
-struct IfStmt {
+pub struct ControlStmt {
     bool: Box<Expr>,
+    control_type: ControlType,
     decls: Option<Box<Decls>>,
-    stmts: Option<Box<Stmts>>
+    stmts: Option<Box<Stmts>>,
 }
 
-impl Stmt for IfStmt {
-    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<dyn Stmt>> where Self: Sized {
+pub enum StmtType {
+    Control(Box<ControlStmt>),
+    Print(Box<PrintStmt>),
+}
+
+impl ToString for StmtType {
+    fn to_string(&self) -> String {
+        match self {
+            StmtType::Control(control) => control.to_string(),
+            StmtType::Print(print) => print.to_string(),
+        }
+    }
+}
+
+enum ControlType {
+    If,
+    While,
+}
+
+impl ControlStmt {
+    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<ControlStmt>>
+    where
+        Self: Sized,
+    {
+        let mut control_type = ControlType::While;
         match &lex[*x] {
-            Token::If => {}
-            _ => return Option::None
+            Token::If => control_type = ControlType::If,
+            Token::While => control_type = ControlType::While,
+            _ => return Option::None,
         }
         *x += 1;
         match &lex[*x] {
             Token::OpenParen => {}
-            _ => return Option::None
+            _ => return Option::None,
         }
+        *x += 1;
         let e = Expr::new(lex, x);
         match &lex[*x] {
             Token::CloseParen => {}
-            _ => return Option::None
+            _ => return Option::None,
         }
         *x += 1;
         match &lex[*x] {
             Token::OpenBrace => {}
-            _ => return Option::None
+            _ => return Option::None,
         }
         *x += 1;
+        println!("in if statement {:?}", lex[*x]);
         let decls = Decls::new(lex, x);
+        println!("in if statement {:?}", lex[*x]);
         let stmts = Stmts::new(lex, x);
+        println!("in if statement {:?}", lex[*x]);
         match &lex[*x] {
             Token::CloseBrace => {}
-            _ => return Option::None
+            _ => return Option::None,
         }
         *x += 1;
-        Some(Box::new(IfStmt {
+        println!("success if statement");
+        Some(Box::new(ControlStmt {
             bool: e.unwrap(),
+            control_type,
             decls,
             stmts,
         }))
     }
 
     fn to_string(&self) -> String {
-        let decl_string = &self.decls.as_ref().unwrap().to_string();
-        let stmt_string = &self.stmts.as_ref().unwrap().to_string();
-        format!("if({}){{{}{}}}",
-                self.bool.to_string(), decl_string, stmt_string)
+        let decl_string = match &self.decls {
+            None => "".to_string(),
+            Some(decls) => decls.to_string(),
+        };
+        let stmt_string = match &self.stmts {
+            None => "".to_string(),
+            Some(stmts) => stmts.to_string(),
+        };
+        format!(
+            "{}({}){{{}{}}}",
+            match self.control_type {
+                ControlType::If => {
+                    "if"
+                }
+                ControlType::While => {
+                    "while"
+                }
+            },
+            self.bool.to_string(),
+            decl_string,
+            stmt_string
+        )
     }
 }
 
-impl Stmt for PrintStmt {
-    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<dyn Stmt>> {
+impl PrintStmt {
+    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<PrintStmt>> {
         match &lex[*x] {
             Token::Print => {}
-            _ => return Option::None
+            _ => return Option::None,
         };
         *x += 1;
         match &lex[*x] {
             Token::OpenParen => {}
-            _ => return Option::None
+            _ => return Option::None,
         };
         *x += 1;
         let e = Expr::new(lex, x);
         match &lex[*x] {
             Token::CloseParen => {}
-            _ => return Option::None
+            _ => return Option::None,
         };
         *x += 1;
-        Some(Box::new(PrintStmt {
-            expr: e.unwrap()
-        }))
+        Some(Box::new(PrintStmt { expr: e.unwrap() }))
     }
 
     fn to_string(&self) -> String {
@@ -92,30 +141,30 @@ impl Stmt for PrintStmt {
     }
 }
 
-trait Stmt {
-    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<dyn Stmt>> where Self: Sized;
+pub trait Stmt {
+    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<StmtType>>
+    where
+        Self: Sized;
     fn to_string(&self) -> String;
+    fn compile(&self, compiler: &Compiler) -> BasicMetadataTypeEnum;
 }
 
-fn parse_stmt(lex: &Lexeme, mut x: &mut usize) -> Option<Box<dyn Stmt>> {
+fn parse_stmt(lex: &Lexeme, mut x: &mut usize) -> Option<StmtType> {
     let save = x.clone();
     match PrintStmt::parse(lex, x) {
         None => {
             *x = save.clone();
-            match IfStmt::parse(lex, x) {
+            match ControlStmt::parse(lex, x) {
                 None => {
                     *x = save.clone();
                     None
                 }
-                Some(if_stmt) => {
-                    Some(if_stmt)
-                }
+                Some(if_stmt) => Some(StmtType::Control(if_stmt)),
             }
         }
-        Some(print) => { Some(print) }
+        Some(print) => Some(StmtType::Print(print)),
     }
 }
-
 
 impl Stmts {
     pub fn new(lex: &Lexeme, mut x: &mut usize) -> Option<Box<Self>> {
@@ -127,16 +176,13 @@ impl Stmts {
                 *x = save;
                 None
             }
-            Some(stmt) => {
-                Some(Box::new(Self {
-                    stmt,
-                    stmts: Stmts::new(lex, x),
-                }))
-            }
+            Some(stmt) => Some(Box::new(Self {
+                stmt,
+                stmts: Stmts::new(lex, x),
+            })),
         }
     }
 }
-
 
 impl ToString for Stmts {
     fn to_string(&self) -> String {
@@ -144,13 +190,7 @@ impl ToString for Stmts {
             Some(ds) => {
                 self.stmt.to_string() + &"\n".to_string() + &ds.to_string() + &"\n".to_string()
             }
-            None => {
-                self.stmt.to_string() + &"\n".to_string()
-            }
+            None => self.stmt.to_string() + &"\n".to_string(),
         }
     }
-}
-
-enum Operation {
-    Equals,
 }

@@ -1,10 +1,10 @@
-use crate::Lexeme;
 use crate::parser::decls::Decls;
 use crate::parser::stmts::Stmts;
+use crate::Lexeme;
 
 pub struct Program {
-    decls: Option<Box<Decls>>,
-    stmts: Option<Box<Stmts>>,
+    pub(crate) decls: Option<Box<Decls>>,
+    pub(crate) stmts: Option<Box<Stmts>>,
 }
 
 impl Program {
@@ -18,14 +18,23 @@ impl Program {
 
 impl ToString for Program {
     fn to_string(&self) -> String {
-        format!("Program {{\n{}{}\n}}",
+        format!(
+            "Program {{\n{}{}\n}}",
             &match &self.decls {
-                None => {"".to_string()}
-                Some(decls) => {decls.to_string()}
+                None => {
+                    "".to_string()
+                }
+                Some(decls) => {
+                    decls.to_string()
+                }
             },
             &match &self.stmts {
-                None => {"".to_string()}
-                Some(stmts) => {stmts.to_string()}
+                None => {
+                    "".to_string()
+                }
+                Some(stmts) => {
+                    stmts.to_string()
+                }
             }
         )
     }
