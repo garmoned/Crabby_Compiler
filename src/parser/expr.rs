@@ -5,6 +5,8 @@ pub enum Operation {
     Equals,
     Times,
     Plus,
+    GT,
+    LT,
 }
 
 #[derive(Debug)]
@@ -12,29 +14,6 @@ pub enum ExprData {
     StrLit(String),
     IntLit(i16),
     Name(String),
-}
-
-pub enum Factor {
-    Data(ExprData),
-    Expr(Box<TopExpr>),
-}
-
-pub enum Term {
-    TermFactor(Option<Box<TermPrime>>, Box<Factor>),
-}
-
-pub enum TermPrime {
-    More(Box<Factor>, Option<Box<TermPrime>>),
-}
-
-pub enum AddExpr {
-    Term(Term),
-    TermExpression(Term, Box<AddExpr>),
-}
-
-pub enum TopExpr {
-    Term(AddExpr),
-    TermExpression(AddExpr, Box<TopExpr>),
 }
 
 pub enum Expr {
@@ -63,6 +42,12 @@ impl Expr {
                 Token::Plus => {
                     perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
                 }
+                Token::GT => {
+                    perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
+                }
+                Token::LT => {
+                    perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
+                }
                 _ => {
                     break;
                 }
@@ -84,6 +69,8 @@ impl From<Token> for Operation {
             Token::Times => Operation::Times,
             Token::Plus => Operation::Plus,
             Token::Equals => Operation::Equals,
+            Token::GT => Operation::GT,
+            Token::LT => Operation::LT,
             _ => panic!("invalid operator"),
         }
     }
@@ -94,6 +81,8 @@ fn get_priority(op: &Operation) -> u8 {
         Operation::Times => 3,
         Operation::Plus => 2,
         Operation::Equals => 1,
+        Operation::GT => 1,
+        Operation::LT => 1,
         _ => panic!("invalid operator"),
     }
 }
@@ -108,8 +97,8 @@ fn perform_operation(expr_stack: &mut Vec<Expr>, op_stack: &mut Vec<Operation>, 
 
 fn combine_expression(expr_stack: &mut Vec<Expr>, op_stack: &mut Vec<Operation>) {
     let op = op_stack.pop().unwrap();
-    let operand1 = expr_stack.pop().unwrap();
     let operand2 = expr_stack.pop().unwrap();
+    let operand1 = expr_stack.pop().unwrap();
     let expr = Expr::Binary(Box::new(operand1), Box::new(operand2), op);
     expr_stack.push(expr)
 }
@@ -136,6 +125,8 @@ impl ToString for Operation {
             Operation::Equals => "==".to_owned(),
             Operation::Times => "*".to_owned(),
             Operation::Plus => "+".to_owned(),
+            Operation::GT => ">".to_owned(),
+            Operation::LT => "<".to_owned(),
         }
     }
 }

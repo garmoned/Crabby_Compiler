@@ -1,5 +1,5 @@
+#![feature(macro_metavar_expr)]
 extern crate core;
-
 use std::borrow::Borrow;
 use std::collections::hash_map;
 use std::ffi::CString;
@@ -77,14 +77,17 @@ fn main() {
 
     fpm.initialize();
 
-    let int_type = context.f16_type();
+    let int_type = context.i16_type();
     let fn_type = context
         .void_type()
         .fn_type(vec![int_type.into()].as_slice(), false);
 
     module.add_function("print_int", fn_type, None);
 
+    println!("{}", p.to_string());
+
     Compiler::compile(&context, &builder, &module, &fpm, p);
+
     unsafe {
         let c_str = CString::new(b"print_int" as &[u8]).unwrap();
         LLVMAddSymbol(c_str.as_ptr(), print_int as *mut c_void)
@@ -94,11 +97,6 @@ fn main() {
         .create_jit_execution_engine(OptimizationLevel::None)
         .unwrap();
 
-    // let compiled_func = unsafe { ee.get_function::<unsafe extern "C" fn(f64) -> f64>("printd") };
-
-    // unsafe {
-    //     compiled_func.unwrap().call(10.0);
-    // }
     let compiled_func = unsafe { ee.get_function::<unsafe extern "C" fn()>("main") };
     match compiled_func {
         Ok(func) => unsafe { func.call() },

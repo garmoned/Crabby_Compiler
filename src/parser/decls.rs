@@ -1,4 +1,3 @@
-use crate::parser::expr::TopExpr;
 use crate::parser::var::Var;
 use crate::{Lexeme, Token};
 
@@ -11,12 +10,13 @@ pub(crate) struct Decl {
 }
 
 pub(crate) struct Decls {
-    decl: Box<Decl>,
-    decls: Option<Box<Decls>>,
+    pub(crate) decl: Box<Decl>,
+    pub(crate) decls: Option<Box<Decls>>,
 }
 
 impl Decl {
     pub fn new(lex: &Lexeme, mut x: &mut usize) -> Self {
+        println!("new decl");
         let ty = match lex[*x] {
             Token::Int => Var::Int,
             Token::Str => Var::Str,

@@ -2,14 +2,12 @@ use inkwell::types::BasicMetadataTypeEnum;
 
 use crate::code_gen::Compiler;
 use crate::parser::decls::Decls;
-use crate::parser::expr::{Expr, TopExpr};
+use crate::parser::expr::Expr;
 use crate::{Lexeme, Token};
 
-use super::expr::ExprData;
-
 pub struct Stmts {
-    pub stmt: StmtType,
-    stmts: Option<Box<Stmts>>,
+    pub(crate) stmt: StmtType,
+    pub(crate) stmts: Option<Box<Stmts>>,
 }
 
 pub struct PrintStmt {

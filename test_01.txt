@@ -1,1 +1,9 @@
-print(7)
+int b = 8 + 2
+int c = 1000
+
+print(b)
+print(c)
+print(b < c)
+print(b > c)
+print(b == c)
+print(10 == 10)

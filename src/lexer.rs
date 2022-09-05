@@ -12,8 +12,6 @@ pub enum Token {
     Int,
     Str,
     While,
-    StringLit(String),
-    IntLit(i16),
     OpenParen,
     CloseParen,
     Assign,
@@ -23,57 +21,147 @@ pub enum Token {
     CloseBrace,
     WhiteSpace,
     Semi,
-    Name(String),
     If,
     Ignore,
     Times,
     Plus,
     Bool,
     EOF,
+    GT,
+    LT,
+    Name(String),
+    StringLit(String),
+    IntLit(i16),
 }
+
+#[derive(Debug, Clone)]
+
+enum RawToken {
+    Int,
+    Str,
+    While,
+    OpenParen,
+    CloseParen,
+    Assign,
+    Equals,
+    Print,
+    OpenBrace,
+    CloseBrace,
+    WhiteSpace,
+    Semi,
+    If,
+    Ignore,
+    Times,
+    Plus,
+    Bool,
+    EOF,
+    Name,
+    StringLit,
+    IntLit,
+    GT,
+    LT,
+}
+
+impl RawToken {
+    fn into_token(self, data: &str) -> Token {
+        match self {
+            RawToken::Int => Token::Int,
+            RawToken::Str => Token::Str,
+            RawToken::While => Token::While,
+            RawToken::OpenParen => Token::OpenParen,
+            RawToken::CloseParen => Token::CloseParen,
+            RawToken::Assign => Token::Assign,
+            RawToken::Equals => Token::Equals,
+            RawToken::Print => Token::Print,
+            RawToken::OpenBrace => Token::OpenBrace,
+            RawToken::CloseBrace => Token::CloseBrace,
+            RawToken::WhiteSpace => Token::WhiteSpace,
+            RawToken::Semi => Token::Semi,
+            RawToken::If => Token::If,
+            RawToken::Ignore => Token::Ignore,
+            RawToken::Times => Token::Times,
+            RawToken::Plus => Token::Plus,
+            RawToken::Bool => Token::Bool,
+            RawToken::EOF => Token::EOF,
+            RawToken::GT => Token::GT,
+            RawToken::LT => Token::LT,
+            RawToken::Name => Token::Name(data.to_string()),
+            RawToken::StringLit => Token::StringLit(data.replace("'", "")),
+            RawToken::IntLit => Token::IntLit(data.parse().unwrap()),
+        }
+    }
+}
+
+pub enum DataToken {}
 
 pub type Lexeme = Vec<Token>;
 
 pub(crate) struct Lexer {
     match_set: RegexSet,
 }
+const LETTER: &str = r"[A-Za-z]";
+const DIGIT: &str = r"[0-9]";
+const STRING_LIT: &str = r#"^"([^"\\]|\\.)*"$"#;
+const WHITE_SPACE: &str = r"^[ \n\t\r]$";
 
-impl Lexer {
-    pub fn new() -> Self {
-        let letter = r"[A-Za-z]";
-        let digit = r"[0-9]";
-        let name = format!("^{}({}|{})*$", letter, letter, digit);
-        let int_lit = format!(r"^{}+$", digit);
-        let string_lit = r#"^"([^"\\]|\\.)*"$"#;
-        let white_space = r"^[ \n\t\r]$";
-        Self {
-            match_set: RegexSet::new(&[
-                r"^int$", //0
-                r"^str$", //1
-                r"^bool$",
-                r"^while$",
-                string_lit,       //2
-                int_lit.borrow(), //3
-                r"^\($",          //4
-                r"^\)$",          //5
-                r"^=$",           //6
-                r"^==$",          //7
-                r"^print$",       //8
-                r"^\{$",          //9
-                r"^}$",           //10
-                white_space,      //11
-                r"^;$",           //12
-                r"^if$",          // 13
-                r"^\*$",          // 14
-                r"^\+$",          //15
-                name.borrow(),    //16
-            ])
-            .unwrap(),
-        }
+macro_rules! implement_lexer {
+
+        ($($pat:expr => $tok:expr), *) => {
+
+                pub fn new() -> Self {
+
+                    Self {
+                        match_set: RegexSet::new(&[
+                            $(
+                                $pat,
+                            )*
+                        ])
+                        .unwrap(),
+                    }
+                }
+
+                fn match_token(&self, txt: &str) -> Option<RawToken> {
+                    let matches: Vec<usize> = self.match_set.matches(txt).into_iter().collect();
+                    let m = matches.get(0).unwrap_or(&(1000 as usize));
+                    match m {
+                        $(
+                            ${index()} => Some($tok),
+                        )*
+                        _ => None
+                    }
+                }
+
+        };
+
     }
 
+impl Lexer {
+    implement_lexer!(
+        r"^int$" => RawToken::Int,
+        r"^str$" => RawToken::Str,
+        r"^bool$" => RawToken::Bool,
+        r"^while$" => RawToken::While,
+        STRING_LIT => RawToken::StringLit,
+        &format!(r"^{}+$", DIGIT) => RawToken::IntLit,
+        r"^\($" => RawToken::OpenParen,
+        r"^\)$" => RawToken::CloseParen,
+        r"^=$" => RawToken::Assign,
+        r"^==$" => RawToken::Equals,
+        r"^>$" => RawToken::GT,
+        r"^<$" => RawToken::LT,
+        r"^print$" => RawToken::Print,
+        r"^\{$"=> RawToken::OpenBrace,
+        r"^}$" => RawToken::CloseBrace,
+        WHITE_SPACE => RawToken::WhiteSpace,
+        r"^;$" => RawToken::Semi,
+        r"^if$" => RawToken::If,
+        r"^\*$" => RawToken::Times,
+        r"^\+$" => RawToken::Plus,
+        &format!("^{}({}|{})*$", LETTER, LETTER, DIGIT) => RawToken::Name
+
+    );
     pub fn tokenize(&self, code: String) -> Lexeme {
-        let mut lexeme = vec![];
+        let mut lexeme: Vec<Token> = vec![];
         let mut prev = "".to_string();
         for char in code.chars() {
             let new = format!("{}{}", prev, char);
@@ -85,8 +173,8 @@ impl Lexer {
                     }
                     Some(tok) => {
                         match tok {
-                            WhiteSpace => (),
-                            _ => lexeme.push(tok),
+                            RawToken::WhiteSpace => (),
+                            _ => lexeme.push(tok.into_token(&prev)),
                         }
                         prev = char.to_string();
                     }
@@ -98,36 +186,9 @@ impl Lexer {
         }
         match self.match_token(&prev) {
             None => {}
-            Some(tok) => lexeme.push(tok),
+            Some(tok) => lexeme.push(tok.into_token(&prev)),
         }
         lexeme.push(Token::EOF);
         lexeme
-    }
-
-    fn match_token(&self, txt: &str) -> Option<Token> {
-        let matches: Vec<usize> = self.match_set.matches(txt).into_iter().collect();
-        let m = matches.get(0).unwrap_or(&(1000 as usize));
-        match m {
-            0 => Some(Int),
-            1 => Some(Str),
-            2 => Some(Token::Bool),
-            3 => Some(Token::While),
-            4 => Some(Token::StringLit(txt.replace("'", ""))),
-            5 => Some(Token::IntLit(txt.parse().unwrap())),
-            6 => Some(OpenParen),
-            7 => Some(CloseParen),
-            8 => Some(Assign),
-            9 => Some(Equals),
-            10 => Some(Print),
-            11 => Some(OpenBrace),
-            12 => Some(CloseBrace),
-            13 => Some(WhiteSpace),
-            14 => Some(Semi),
-            15 => Some(If),
-            16 => Some(Token::Times),
-            17 => Some(Token::Plus),
-            18 => Some(Token::Name(txt.parse().unwrap())),
-            _ => None,
-        }
     }
 }

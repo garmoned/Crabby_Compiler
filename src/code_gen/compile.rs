@@ -1,4 +1,7 @@
-use std::{collections::HashMap, vec};
+use std::{
+    collections::{btree_map::Values, HashMap},
+    vec,
+};
 
 use inkwell::{
     basic_block::BasicBlock,
@@ -6,16 +9,19 @@ use inkwell::{
     context::Context,
     module::Module,
     passes::PassManager,
+    types::BasicMetadataTypeEnum,
     values::{
-        BasicMetadataValueEnum, CallSiteValue, FunctionValue, InstructionValue, PointerValue,
+        BasicMetadataValueEnum, BasicValue, CallSiteValue, FunctionValue, InstructionValue,
+        PointerValue,
     },
 };
 
 use crate::parser::{
     decls::{Decl, Decls},
-    expr::{AddExpr, Expr, ExprData, Factor, Term, TopExpr},
-    program::{self, Program},
-    stmts::{ControlStmt, PrintStmt, Stmt, StmtType, Stmts},
+    expr::{Expr, ExprData, Operation},
+    program::Program,
+    stmts::{PrintStmt, StmtType, Stmts},
+    var::Var,
 };
 
 use super::Compiler;
@@ -28,7 +34,7 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
         pass_manager: &'a PassManager<FunctionValue<'ctx>>,
         program: Program,
     ) -> FunctionValue<'ctx> {
-        let compiler: Compiler<'a, 'ctx> = Compiler {
+        let mut compiler: Compiler<'a, 'ctx> = Compiler {
             context: context,
             builder: builder,
             module: module,
@@ -38,16 +44,25 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
         compiler.compile_program(program)
     }
 
-    fn compile_program(&self, program: Program) -> FunctionValue<'ctx> {
+    fn compile_program(&mut self, program: Program) -> FunctionValue<'ctx> {
         let fn_type = self.context.void_type().fn_type(vec![].as_slice(), false);
         let fn_val = self.module.add_function("main", fn_type, None);
         let entry = self.context.append_basic_block(fn_val, "entry");
         self.builder.position_at_end(entry);
-        self.compile_stmts(*program.stmts.unwrap());
+
+        match program.decls {
+            Some(decls) => self.compile_decls(*decls),
+            None => {}
+        }
+
+        match program.stmts {
+            Some(stmts) => self.compile_stmts(*stmts),
+            None => {}
+        }
+
         self.builder.build_return(None);
 
         if fn_val.verify(true) {
-            println!("verified");
             self.fpm.run_on(&fn_val);
         } else {
             println!("main is borked")
@@ -61,26 +76,125 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
             StmtType::Control(_) => todo!(),
             StmtType::Print(print) => self.compile_print(*print),
         }
+        match stmts.stmts {
+            Some(next) => self.compile_stmts(*next),
+            None => {}
+        }
     }
 
     fn compile_print(&self, print: PrintStmt) {
         let func = self.module.get_function("print_int").unwrap();
         let args = vec![self.compile_expr(*print.expr)];
-        self.builder.build_call(func, &args, "tmp");
+
+        self.builder
+            .build_call(func, &args, "tmp")
+            .try_as_basic_value()
+            .left();
     }
 
-    fn compile_decls(&self, decls: Decls) {}
+    fn compile_decls(&mut self, decls: Decls) {
+        self.compile_decl(*decls.decl);
+        match decls.decls {
+            Some(decls) => self.compile_decls(*decls),
+            None => {}
+        }
+    }
 
-    fn compile_decl(&self, decl: Decl) {}
+    fn compile_decl(&mut self, decl: Decl) {
+        let ty = match decl.ty {
+            Var::Str => todo!(),
+            Var::Int => self.context.i16_type(),
+            Var::Bool => todo!(),
+        };
+
+        let alloc = self.builder.build_alloca(ty, decl.name.as_str());
+
+        match self.compile_expr(*decl.expr) {
+            BasicMetadataValueEnum::ArrayValue(_) => todo!(),
+            BasicMetadataValueEnum::IntValue(int_val) => {
+                self.builder.build_store(alloc, int_val);
+            }
+            BasicMetadataValueEnum::FloatValue(_) => todo!(),
+            BasicMetadataValueEnum::PointerValue(_) => todo!(),
+            BasicMetadataValueEnum::StructValue(_) => todo!(),
+            BasicMetadataValueEnum::VectorValue(_) => todo!(),
+            BasicMetadataValueEnum::MetadataValue(_) => todo!(),
+        }
+        self.variables.insert(decl.name.to_string(), alloc);
+    }
 
     fn compile_expr(&self, expr: Expr) -> BasicMetadataValueEnum {
         match expr {
             Expr::Unary(data) => match data {
                 ExprData::StrLit(_) => todo!(),
-                ExprData::IntLit(_) => self.context.i16_type().const_int(10, false).into(),
-                ExprData::Name(_) => todo!(),
+                ExprData::IntLit(int) => self
+                    .context
+                    .i16_type()
+                    .const_int(int.try_into().unwrap(), false)
+                    .into(),
+                ExprData::Name(name) => {
+                    let ptr = self.variables.get(name.as_str()).unwrap();
+                    self.builder
+                        .build_load(*ptr, name.as_str())
+                        .into_int_value()
+                        .into()
+                }
             },
-            Expr::Binary(_, _, _) => todo!(),
+            Expr::Binary(left, right, op) => self.compile_binary_expr(*left, *right, op),
+        }
+    }
+
+    fn compile_binary_expr(
+        &self,
+        left: Expr,
+        right: Expr,
+        op: Operation,
+    ) -> BasicMetadataValueEnum {
+        let left = self.compile_expr(left);
+        let right = self.compile_expr(right);
+
+        match op {
+            Operation::Equals => {
+                let comp = self.builder.build_int_compare(
+                    inkwell::IntPredicate::EQ,
+                    left.into_int_value(),
+                    right.into_int_value(),
+                    "tmp",
+                );
+                self.builder
+                    .build_int_cast(comp, self.context.i16_type(), "cast")
+                    .into()
+            }
+            Operation::GT => {
+                let comp = self.builder.build_int_compare(
+                    inkwell::IntPredicate::SGT,
+                    left.into_int_value(),
+                    right.into_int_value(),
+                    "tmp",
+                );
+                self.builder
+                    .build_int_cast(comp, self.context.i16_type(), "cast")
+                    .into()
+            }
+            Operation::LT => {
+                let comp = self.builder.build_int_compare(
+                    inkwell::IntPredicate::SLT,
+                    left.into_int_value(),
+                    right.into_int_value(),
+                    "tmp",
+                );
+                self.builder
+                    .build_int_cast(comp, self.context.i16_type(), "cast")
+                    .into()
+            }
+            Operation::Times => self
+                .builder
+                .build_int_mul(left.into_int_value(), right.into_int_value(), "tmp")
+                .into(),
+            Operation::Plus => self
+                .builder
+                .build_int_add(left.into_int_value(), right.into_int_value(), "tmp")
+                .into(),
         }
     }
 }
