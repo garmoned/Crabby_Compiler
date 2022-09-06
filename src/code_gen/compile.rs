@@ -14,13 +14,14 @@ use inkwell::{
         BasicMetadataValueEnum, BasicValue, CallSiteValue, FunctionValue, InstructionValue,
         PointerValue,
     },
+    IntPredicate,
 };
 
 use crate::parser::{
     decls::{Decl, Decls},
     expr::{Expr, ExprData, Operation},
     program::Program,
-    stmts::{PrintStmt, StmtType, Stmts},
+    stmts::{self, ControlStmt, PrintStmt, StmtType, Stmts},
     var::Var,
 };
 
@@ -34,20 +35,21 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
         pass_manager: &'a PassManager<FunctionValue<'ctx>>,
         program: Program,
     ) -> FunctionValue<'ctx> {
+        let fn_type = context.void_type().fn_type(vec![].as_slice(), false);
+        let fn_val = module.add_function("main", fn_type, None);
         let mut compiler: Compiler<'a, 'ctx> = Compiler {
             context: context,
             builder: builder,
             module: module,
             fpm: pass_manager,
+            fn_val: fn_val,
             variables: HashMap::new(),
         };
         compiler.compile_program(program)
     }
 
     fn compile_program(&mut self, program: Program) -> FunctionValue<'ctx> {
-        let fn_type = self.context.void_type().fn_type(vec![].as_slice(), false);
-        let fn_val = self.module.add_function("main", fn_type, None);
-        let entry = self.context.append_basic_block(fn_val, "entry");
+        let entry = self.context.append_basic_block(self.fn_val, "entry");
         self.builder.position_at_end(entry);
 
         match program.decls {
@@ -62,23 +64,56 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
 
         self.builder.build_return(None);
 
-        if fn_val.verify(true) {
-            self.fpm.run_on(&fn_val);
+        if self.fn_val.verify(true) {
+            self.fpm.run_on(&self.fn_val);
         } else {
             println!("main is borked")
         }
 
-        return fn_val;
+        return self.fn_val;
     }
 
-    fn compile_stmts(&self, stmts: Stmts) {
+    fn compile_stmts(&mut self, stmts: Stmts) {
         match stmts.stmt {
-            StmtType::Control(_) => todo!(),
+            StmtType::Control(control) => self.compile_control(*control),
             StmtType::Print(print) => self.compile_print(*print),
         }
         match stmts.stmts {
             Some(next) => self.compile_stmts(*next),
             None => {}
+        }
+    }
+
+    fn compile_control(&mut self, stmt: ControlStmt) {
+        match stmt.control_type {
+            If => {
+                let cond = self.compile_expr(*stmt.bool).into_int_value();
+                let zero_const = self.context.i16_type().const_int(0, false);
+                let cond = self
+                    .builder
+                    .build_int_compare(IntPredicate::NE, cond, zero_const, "if");
+                let then_bb = self.context.append_basic_block(self.fn_val, "then");
+                let cont_bb = self.context.append_basic_block(self.fn_val, "cont");
+                let else_bb = self.context.append_basic_block(self.fn_val, "else");
+                self.builder
+                    .build_conditional_branch(cond, then_bb, else_bb);
+                self.builder.position_at_end(then_bb);
+                if let Some(decls) = stmt.decls {
+                    self.compile_decls(*decls)
+                }
+                if let Some(stmts) = stmt.stmts {
+                    self.compile_stmts(*stmts)
+                }
+                self.builder.build_unconditional_branch(cont_bb);
+
+                /* TODO: implement else statements */
+                self.builder.position_at_end(else_bb);
+                self.builder.build_unconditional_branch(cont_bb);
+                self.builder.position_at_end(cont_bb)
+            }
+            While => {
+                todo!()
+            }
         }
     }
 

@@ -21,4 +21,5 @@ pub struct Compiler<'a, 'ctx> {
     pub module: &'a Module<'ctx>,
     variables: HashMap<String, PointerValue<'ctx>>,
     pub fpm: &'a PassManager<FunctionValue<'ctx>>,
+    pub fn_val: FunctionValue<'ctx>,
 }

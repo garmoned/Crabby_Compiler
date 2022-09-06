@@ -105,11 +105,8 @@ const STRING_LIT: &str = r#"^"([^"\\]|\\.)*"$"#;
 const WHITE_SPACE: &str = r"^[ \n\t\r]$";
 
 macro_rules! implement_lexer {
-
         ($($pat:expr => $tok:expr), *) => {
-
                 pub fn new() -> Self {
-
                     Self {
                         match_set: RegexSet::new(&[
                             $(
@@ -130,7 +127,6 @@ macro_rules! implement_lexer {
                         _ => None
                     }
                 }
-
         };
 
     }

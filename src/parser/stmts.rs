@@ -15,10 +15,10 @@ pub struct PrintStmt {
 }
 
 pub struct ControlStmt {
-    bool: Box<Expr>,
-    control_type: ControlType,
-    decls: Option<Box<Decls>>,
-    stmts: Option<Box<Stmts>>,
+    pub bool: Box<Expr>,
+    pub control_type: ControlType,
+    pub(crate) decls: Option<Box<Decls>>,
+    pub stmts: Option<Box<Stmts>>,
 }
 
 pub enum StmtType {
@@ -35,7 +35,7 @@ impl ToString for StmtType {
     }
 }
 
-enum ControlType {
+pub enum ControlType {
     If,
     While,
 }
