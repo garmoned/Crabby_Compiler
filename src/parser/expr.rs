@@ -26,32 +26,63 @@ impl Expr {
         let save = x.clone();
         let mut expr_stack: Vec<Expr> = vec![];
         let mut op_stack: Vec<Operation> = vec![];
+        let mut get_op = false;
         loop {
             match &lex[*x] {
                 Token::StringLit(string) => {
+                    if get_op {
+                        break;
+                    }
                     expr_stack.push(Expr::Unary(ExprData::StrLit(string.to_string())))
                 }
-                Token::IntLit(int) => expr_stack.push(Expr::Unary(ExprData::IntLit(*int))),
-                Token::Name(name) => expr_stack.push(Expr::Unary(ExprData::Name(name.to_string()))),
+                Token::IntLit(int) => {
+                    if get_op {
+                        break;
+                    }
+                    expr_stack.push(Expr::Unary(ExprData::IntLit(*int)))
+                }
+
+                Token::Name(name) => {
+                    if get_op {
+                        break;
+                    }
+                    expr_stack.push(Expr::Unary(ExprData::Name(name.to_string())))
+                }
                 Token::Times => {
+                    if !get_op {
+                        break;
+                    }
                     perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
                 }
                 Token::Equals => {
+                    if !get_op {
+                        break;
+                    }
                     perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
                 }
                 Token::Plus => {
+                    if !get_op {
+                        break;
+                    }
                     perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
                 }
                 Token::GT => {
+                    if !get_op {
+                        break;
+                    }
                     perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
                 }
                 Token::LT => {
+                    if !get_op {
+                        break;
+                    }
                     perform_operation(&mut expr_stack, &mut op_stack, lex[*x].clone().into())
                 }
                 _ => {
                     break;
                 }
             }
+            get_op = !get_op;
             *x += 1
         }
 

@@ -21,7 +21,7 @@ use crate::parser::{
     decls::{Decl, Decls},
     expr::{Expr, ExprData, Operation},
     program::Program,
-    stmts::{self, ControlStmt, PrintStmt, StmtType, Stmts},
+    stmts::{self, AssignStmt, ControlStmt, ControlType, PrintStmt, StmtType, Stmts},
     var::Var,
 };
 
@@ -77,6 +77,7 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
         match stmts.stmt {
             StmtType::Control(control) => self.compile_control(*control),
             StmtType::Print(print) => self.compile_print(*print),
+            StmtType::Assign(assign) => self.compile_assign(*assign),
         }
         match stmts.stmts {
             Some(next) => self.compile_stmts(*next),
@@ -84,9 +85,13 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
         }
     }
 
+    fn compile_assign(&mut self, stmt: AssignStmt) {
+        todo!()
+    }
+
     fn compile_control(&mut self, stmt: ControlStmt) {
         match stmt.control_type {
-            If => {
+            ControlType::If => {
                 let cond = self.compile_expr(*stmt.bool).into_int_value();
                 let zero_const = self.context.i16_type().const_int(0, false);
                 let cond = self
@@ -111,8 +116,25 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
                 self.builder.build_unconditional_branch(cont_bb);
                 self.builder.position_at_end(cont_bb)
             }
-            While => {
-                todo!()
+            ControlType::While => {
+                let zero_const = self.context.i16_type().const_int(0, false);
+                let loop_bb = self.context.append_basic_block(self.fn_val, "loop body");
+                self.builder.build_unconditional_branch(loop_bb);
+                self.builder.position_at_end(loop_bb);
+                if let Some(decls) = stmt.decls {
+                    self.compile_decls(*decls)
+                }
+                if let Some(stmts) = stmt.stmts {
+                    self.compile_stmts(*stmts)
+                }
+                let after_bb = self.context.append_basic_block(self.fn_val, "afterloop");
+                let cond = self.compile_expr(*stmt.bool).into_int_value();
+                let cond = self
+                    .builder
+                    .build_int_compare(IntPredicate::EQ, cond, zero_const, "if");
+                self.builder
+                    .build_conditional_branch(cond, after_bb, loop_bb);
+                self.builder.position_at_end(after_bb);
             }
         }
     }

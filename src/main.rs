@@ -1,31 +1,18 @@
 #![feature(macro_metavar_expr)]
 extern crate core;
-use std::borrow::Borrow;
-use std::collections::hash_map;
 use std::ffi::CString;
-use std::fmt::{Display, Formatter};
 use std::fs;
-use std::iter::Map;
-use std::mem::zeroed;
-use std::ptr::addr_of_mut;
-use std::str::Chars;
-use std::sync::Mutex;
 
 use code_gen::Compiler;
 use inkwell::context::Context;
-use inkwell::execution_engine::ExecutionEngine;
-use inkwell::module::Linkage;
 use inkwell::passes::PassManager;
-use inkwell::types::{FunctionType, VoidType};
 use inkwell::OptimizationLevel;
 use libc::c_void;
 use llvm_sys::support::LLVMAddSymbol;
-use regex::RegexSet;
 
 use parser::program::Program;
 
-use crate::lexer::{Lexeme, Lexer, Token};
-use crate::Token::IntLit;
+use crate::lexer::{Lexeme, Token};
 
 mod code_gen;
 mod lexer;
@@ -36,17 +23,6 @@ pub extern "C" fn print_int(int: i16) {
     println!("{}", int);
     return;
 }
-
-// // Adding the functions above to a global array,
-// // so Rust compiler won't remove them.
-// #[used]
-// static EXTERNAL_FNS: [extern "C" fn(i16); 1] = [print_int];
-
-// #[no_mangle]
-// pub extern "C" fn printd(x: f64) -> f64 {
-//     println!("{}", x);
-//     x
-// }
 
 // Adding the functions above to a global array,
 // so Rust compiler won't remove them.
@@ -86,22 +62,22 @@ fn main() {
 
     println!("{}", p.to_string());
 
-    Compiler::compile(&context, &builder, &module, &fpm, p);
+    // Compiler::compile(&context, &builder, &module, &fpm, p);
 
-    unsafe {
-        let c_str = CString::new(b"print_int" as &[u8]).unwrap();
-        LLVMAddSymbol(c_str.as_ptr(), print_int as *mut c_void)
-    }
+    // unsafe {
+    //     let c_str = CString::new(b"print_int" as &[u8]).unwrap();
+    //     LLVMAddSymbol(c_str.as_ptr(), print_int as *mut c_void)
+    // }
 
-    let ee = module
-        .create_jit_execution_engine(OptimizationLevel::None)
-        .unwrap();
+    // let ee = module
+    //     .create_jit_execution_engine(OptimizationLevel::None)
+    //     .unwrap();
 
-    let compiled_func = unsafe { ee.get_function::<unsafe extern "C" fn()>("main") };
-    match compiled_func {
-        Ok(func) => unsafe { func.call() },
-        Err(err) => {
-            println!("error during compilation {:?}", &err);
-        }
-    };
+    // let compiled_func = unsafe { ee.get_function::<unsafe extern "C" fn()>("main") };
+    // match compiled_func {
+    //     Ok(func) => unsafe { func.call() },
+    //     Err(err) => {
+    //         println!("error during compilation {:?}", &err);
+    //     }
+    // };
 }

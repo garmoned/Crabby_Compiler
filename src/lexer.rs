@@ -161,7 +161,6 @@ impl Lexer {
         let mut prev = "".to_string();
         for char in code.chars() {
             let new = format!("{}{}", prev, char);
-            println!("{}, {}", prev, new);
             match self.match_token(new.as_str()) {
                 None => match self.match_token(prev.as_str()) {
                     None => {

@@ -1,6 +1,3 @@
-use inkwell::types::BasicMetadataTypeEnum;
-
-use crate::code_gen::Compiler;
 use crate::parser::decls::Decls;
 use crate::parser::expr::Expr;
 use crate::{Lexeme, Token};
@@ -21,9 +18,15 @@ pub struct ControlStmt {
     pub stmts: Option<Box<Stmts>>,
 }
 
+pub struct AssignStmt {
+    pub name: String,
+    pub expr: Box<Expr>,
+}
+
 pub enum StmtType {
     Control(Box<ControlStmt>),
     Print(Box<PrintStmt>),
+    Assign(Box<AssignStmt>),
 }
 
 impl ToString for StmtType {
@@ -31,6 +34,7 @@ impl ToString for StmtType {
         match self {
             StmtType::Control(control) => control.to_string(),
             StmtType::Print(print) => print.to_string(),
+            StmtType::Assign(assign) => assign.to_string(),
         }
     }
 }
@@ -139,15 +143,33 @@ impl PrintStmt {
     }
 }
 
-pub trait Stmt {
-    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<StmtType>>
-    where
-        Self: Sized;
-    fn to_string(&self) -> String;
-    fn compile(&self, compiler: &Compiler) -> BasicMetadataTypeEnum;
+impl AssignStmt {
+    fn parse(lex: &Lexeme, x: &mut usize) -> Option<Box<AssignStmt>> {
+        let mut name = "";
+        match &lex[*x] {
+            Token::Name(real_name) => name = real_name,
+            _ => return Option::None,
+        };
+        *x += 1;
+        match &lex[*x] {
+            Token::Assign => {}
+            _ => return Option::None,
+        };
+        *x += 1;
+        if let Some(e) = Expr::new(lex, x) {
+            return Some(Box::new(AssignStmt {
+                expr: e,
+                name: name.to_string(),
+            }));
+        }
+        None
+    }
+    fn to_string(&self) -> String {
+        format!("assign {} = {}", self.name, self.expr.to_string())
+    }
 }
 
-fn parse_stmt(lex: &Lexeme, mut x: &mut usize) -> Option<StmtType> {
+fn parse_stmt(lex: &Lexeme, x: &mut usize) -> Option<StmtType> {
     let save = x.clone();
     match PrintStmt::parse(lex, x) {
         None => {
@@ -155,7 +177,13 @@ fn parse_stmt(lex: &Lexeme, mut x: &mut usize) -> Option<StmtType> {
             match ControlStmt::parse(lex, x) {
                 None => {
                     *x = save.clone();
-                    None
+                    match AssignStmt::parse(lex, x) {
+                        Some(assign) => Some(StmtType::Assign(assign)),
+                        None => {
+                            *x = save.clone();
+                            None
+                        }
+                    }
                 }
                 Some(if_stmt) => Some(StmtType::Control(if_stmt)),
             }
@@ -165,7 +193,7 @@ fn parse_stmt(lex: &Lexeme, mut x: &mut usize) -> Option<StmtType> {
 }
 
 impl Stmts {
-    pub fn new(lex: &Lexeme, mut x: &mut usize) -> Option<Box<Self>> {
+    pub fn new(lex: &Lexeme, x: &mut usize) -> Option<Box<Self>> {
         let save = x.clone();
         println!("new statements");
         let st = parse_stmt(lex, x);
