@@ -15,8 +15,7 @@ pub(crate) struct Decls {
 }
 
 impl Decl {
-    pub fn new(lex: &Lexeme, mut x: &mut usize) -> Self {
-        println!("new decl");
+    pub fn new(lex: &Lexeme, x: &mut usize) -> Self {
         let ty = match lex[*x] {
             Token::Int => Var::Int,
             Token::Str => Var::Str,

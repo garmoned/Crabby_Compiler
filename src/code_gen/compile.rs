@@ -86,7 +86,11 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
     }
 
     fn compile_assign(&mut self, stmt: AssignStmt) {
-        todo!()
+        let ptr = self.variables.get(&stmt.name).unwrap();
+        match self.compile_expr(*stmt.expr) {
+            BasicMetadataValueEnum::IntValue(int) => self.builder.build_store(*ptr, int),
+            _ => todo!(),
+        };
     }
 
     fn compile_control(&mut self, stmt: ControlStmt) {
@@ -140,13 +144,19 @@ impl<'a, 'ctx> Compiler<'a, 'ctx> {
     }
 
     fn compile_print(&self, print: PrintStmt) {
-        let func = self.module.get_function("print_int").unwrap();
-        let args = vec![self.compile_expr(*print.expr)];
-
-        self.builder
-            .build_call(func, &args, "tmp")
-            .try_as_basic_value()
-            .left();
+        let e = self.compile_expr(*print.expr);
+        let func_name = match e {
+            BasicMetadataValueEnum::ArrayValue(_) => todo!(),
+            BasicMetadataValueEnum::IntValue(_) => "print_int",
+            BasicMetadataValueEnum::FloatValue(_) => todo!(),
+            BasicMetadataValueEnum::PointerValue(_) => todo!(),
+            BasicMetadataValueEnum::StructValue(_) => todo!(),
+            BasicMetadataValueEnum::VectorValue(_) => todo!(),
+            BasicMetadataValueEnum::MetadataValue(_) => todo!(),
+        };
+        let func = self.module.get_function(func_name).unwrap();
+        let args = vec![e];
+        self.builder.build_call(func, &args, "tmp");
     }
 
     fn compile_decls(&mut self, decls: Decls) {

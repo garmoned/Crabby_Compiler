@@ -7,11 +7,6 @@ use inkwell::{
     passes::PassManager,
     values::{FunctionValue, PointerValue},
 };
-// #[no_mangle]
-// pub unsafe extern "C" fn print_str(data: *mut u8, len: usize) {
-//     let s = String::from_raw_parts(data, len, len);
-//     print!("{}", s);
-// }
 
 mod compile;
 

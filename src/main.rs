@@ -31,7 +31,7 @@ static EXTERNAL_FNS: [extern "C" fn(i16); 1] = [print_int];
 
 fn main() {
     let lexer = lexer::Lexer::new();
-    let contents = fs::read_to_string("test_01.txt").unwrap();
+    let contents = fs::read_to_string("fib.txt").unwrap();
     let lexeme = lexer.tokenize(contents);
     let mut lex_p = 0;
     let p = Program::new(&lexeme, &mut lex_p);
@@ -62,22 +62,22 @@ fn main() {
 
     println!("{}", p.to_string());
 
-    // Compiler::compile(&context, &builder, &module, &fpm, p);
+    Compiler::compile(&context, &builder, &module, &fpm, p);
 
-    // unsafe {
-    //     let c_str = CString::new(b"print_int" as &[u8]).unwrap();
-    //     LLVMAddSymbol(c_str.as_ptr(), print_int as *mut c_void)
-    // }
+    unsafe {
+        let c_str = CString::new(b"print_int" as &[u8]).unwrap();
+        LLVMAddSymbol(c_str.as_ptr(), print_int as *mut c_void)
+    }
 
-    // let ee = module
-    //     .create_jit_execution_engine(OptimizationLevel::None)
-    //     .unwrap();
+    let ee = module
+        .create_jit_execution_engine(OptimizationLevel::None)
+        .unwrap();
 
-    // let compiled_func = unsafe { ee.get_function::<unsafe extern "C" fn()>("main") };
-    // match compiled_func {
-    //     Ok(func) => unsafe { func.call() },
-    //     Err(err) => {
-    //         println!("error during compilation {:?}", &err);
-    //     }
-    // };
+    let compiled_func = unsafe { ee.get_function::<unsafe extern "C" fn()>("main") };
+    match compiled_func {
+        Ok(func) => unsafe { func.call() },
+        Err(err) => {
+            println!("error during compilation {:?}", &err);
+        }
+    };
 }

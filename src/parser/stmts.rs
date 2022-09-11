@@ -72,17 +72,13 @@ impl ControlStmt {
             _ => return Option::None,
         }
         *x += 1;
-        println!("in if statement {:?}", lex[*x]);
         let decls = Decls::new(lex, x);
-        println!("in if statement {:?}", lex[*x]);
         let stmts = Stmts::new(lex, x);
-        println!("in if statement {:?}", lex[*x]);
         match &lex[*x] {
             Token::CloseBrace => {}
             _ => return Option::None,
         }
         *x += 1;
-        println!("success if statement");
         Some(Box::new(ControlStmt {
             bool: e.unwrap(),
             control_type,
@@ -195,7 +191,6 @@ fn parse_stmt(lex: &Lexeme, x: &mut usize) -> Option<StmtType> {
 impl Stmts {
     pub fn new(lex: &Lexeme, x: &mut usize) -> Option<Box<Self>> {
         let save = x.clone();
-        println!("new statements");
         let st = parse_stmt(lex, x);
         match st {
             None => {
