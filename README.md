@@ -1,5 +1,6 @@
 # Crabby_Compiler
 Successfully made a worse version of C in rust!
+LLVM did a lot of the heavy lifting here
 
 Features:
 INTS!
