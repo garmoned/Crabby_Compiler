@@ -97,7 +97,7 @@ impl ControlStmt {
             Some(stmts) => stmts.to_string(),
         };
         format!(
-            "{}({}){{{}{}}}",
+            "{}({}){{\n{}{}\n}}",
             match self.control_type {
                 ControlType::If => {
                     "if"

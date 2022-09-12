@@ -1,19 +1,11 @@
-
 int i = 0
+int f1 = 0
+int f2 = 1
 
-int p = 1
-int p2 = 1
-
-while(i < 100) {
-
-    int x = p + p2
-
-    if(i < 4) {
-        print(x)
-    }
-
-    p = p2 
-    p2 = x
-
+while (i < 20) {
+    int x = f1 + f2
+    print(x)
+    f1 = f2
+    f2 = x
     i = i + 1
 }

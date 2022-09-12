@@ -1,3 +1,5 @@
+use std::process::Command;
+
 fn main() {
     if cfg!(all(
         not(target_os = "windows"),
@@ -5,4 +7,8 @@ fn main() {
     )) {
         println!("cargo:rustc-link-lib=dylib=ffi");
     }
+    Command::new("rustc")
+        .args(&["--crate-type", "staticlib", "src/io.rs"])
+        .status()
+        .unwrap();
 }

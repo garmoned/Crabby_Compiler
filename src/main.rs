@@ -2,32 +2,25 @@
 extern crate core;
 use std::ffi::CString;
 use std::fs;
+use std::process::Command;
 
 use code_gen::Compiler;
-use inkwell::context::Context;
 use inkwell::passes::PassManager;
+use inkwell::targets::{CodeModel, InitializationConfig, RelocMode, Target};
 use inkwell::OptimizationLevel;
+use inkwell::{context::Context, targets::TargetMachine};
 use libc::c_void;
 use llvm_sys::support::LLVMAddSymbol;
 
+use llvm_sys::target_machine;
 use parser::program::Program;
 
 use crate::lexer::{Lexeme, Token};
 
 mod code_gen;
+mod io;
 mod lexer;
 mod parser;
-
-#[no_mangle]
-pub extern "C" fn print_int(int: i16) {
-    println!("{}", int);
-    return;
-}
-
-// Adding the functions above to a global array,
-// so Rust compiler won't remove them.
-#[used]
-static EXTERNAL_FNS: [extern "C" fn(i16); 1] = [print_int];
 
 fn main() {
     let lexer = lexer::Lexer::new();
@@ -66,18 +59,34 @@ fn main() {
 
     unsafe {
         let c_str = CString::new(b"print_int" as &[u8]).unwrap();
-        LLVMAddSymbol(c_str.as_ptr(), print_int as *mut c_void)
+        LLVMAddSymbol(c_str.as_ptr(), io::print_int as *mut c_void)
     }
 
-    let ee = module
-        .create_jit_execution_engine(OptimizationLevel::None)
+    Target::initialize_all(&InitializationConfig::default());
+
+    let target_triple = TargetMachine::get_default_triple();
+    let target = Target::from_triple(&target_triple).unwrap();
+    let target_machine = target
+        .create_target_machine(
+            &target_triple,
+            "generic",
+            "",
+            OptimizationLevel::Default,
+            RelocMode::Default,
+            CodeModel::Default,
+        )
+        .unwrap();
+    let output_filename = "object_file";
+    target_machine
+        .write_to_file(
+            &module,
+            inkwell::targets::FileType::Object,
+            output_filename.as_ref(),
+        )
         .unwrap();
 
-    let compiled_func = unsafe { ee.get_function::<unsafe extern "C" fn()>("main") };
-    match compiled_func {
-        Ok(func) => unsafe { func.call() },
-        Err(err) => {
-            println!("error during compilation {:?}", &err);
-        }
-    };
+    Command::new("clang")
+        .args(&["object_file", "libio.a"])
+        .status()
+        .unwrap();
 }
