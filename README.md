@@ -8,6 +8,8 @@ While loops!
 if statements!
 Probably turing complete!
 
+Sadly still has to use Clang just for the linking step because linking is hard.
+
 Sample program:
 
 int i = 0
